@@ -16,8 +16,9 @@ from pupil_labs.realtime_api import (
 import typing as T
 import cv2
 import os
+from AudioRecorder import AudioRecorder
 
-collect_data = False
+
 
 async def main():
     # global collect_data
@@ -47,6 +48,9 @@ async def main():
         
         queue_video = asyncio.Queue()
         queue_gaze = asyncio.Queue()
+        queue_audio = asyncio.Queue()
+        audio_recorder = AudioRecorder()
+        
         
         process_video = asyncio.create_task(
             enqueue_sensor_data(
@@ -62,13 +66,30 @@ async def main():
                 control_signal
             )
         )
+        process_audio = asyncio.create_task(
+            enqueue_audio_data(
+                audio_recorder,
+                queue_audio,
+                control_signal
+            )
+        )
         
         try:
-            await save_query_data(queue_video, queue_gaze, control_signal)
+            await save_query_data(queue_video, queue_gaze, queue_audio, control_signal)
         finally:
             process_video.cancel()
             process_gaze.cancel()
+            process_audio.cancel()
+            
         
+async def enqueue_audio_data(audio: AudioRecorder, queue: asyncio.Queue, control_signal: ControlSignalBase) -> None:
+    ''' 将传感器的数据不断加入某个队列中 '''
+    async for frame in audio.iter_frame():
+        if control_signal.is_active():
+            try:
+                queue.put_nowait(frame)
+            except asyncio.QueueFull:
+                print("Queue is full, dropping")
          
     
 async def enqueue_sensor_data(sensor: T.AsyncIterator, queue: asyncio.Queue, control_signal: ControlSignalBase) -> None:
@@ -81,15 +102,18 @@ async def enqueue_sensor_data(sensor: T.AsyncIterator, queue: asyncio.Queue, con
                 print(f"Queue is full, dropping {datum}")
 
 
-async def save_query_data(queue_video: asyncio.Queue, queue_gaze: asyncio.Queue, control_signal: ControlSignalBase):
-    ''' 保存数据 '''
+async def save_query_data(queue_video: asyncio.Queue, queue_gaze: asyncio.Queue, queue_audio: asyncio.Queue, control_signal: ControlSignalBase):
+    ''' 保存数据
+    在检测到录制结束的信号以及保存数据的信号时，将数据保存到文件中，保存成功后将保存数据的信号复位
+    '''
     while True:
         if (not control_signal.is_active()) and control_signal.to_be_save():
-            # get out all the data in both queue and save them
             print("saving data")
+            # ------------ dumping queue data to list ------------
             video_data = []
             video_timestamp = []
             gaze_data = []
+            audio_data = []
             while not queue_video.empty():
                 timestamp, frame = await queue_video.get()
                 video_data.append(frame.to_ndarray(format="bgr24"))
@@ -97,6 +121,10 @@ async def save_query_data(queue_video: asyncio.Queue, queue_gaze: asyncio.Queue,
             while not queue_gaze.empty():
                 timestamp, gaze = await queue_gaze.get()
                 gaze_data.append(gaze)
+            while not queue_audio.empty():
+                audio_data.append(await queue_audio.get())
+            
+            # ------------ saving data ------------
             data_dir = os.path.join("data", str(video_timestamp[0]))
             os.makedirs(data_dir, exist_ok=True)
             with open (os.path.join(data_dir, "gaze_data.json"), "w") as f:
@@ -110,6 +138,7 @@ async def save_query_data(queue_video: asyncio.Queue, queue_gaze: asyncio.Queue,
             for frame in video_data:
                 video.write(frame)
             video.release()
+            AudioRecorder.save_wavefile(os.path.join(data_dir, "audio.wav"), audio_data)
             print("data saved!")
             await control_signal.save_executed()
         await asyncio.sleep(1)
