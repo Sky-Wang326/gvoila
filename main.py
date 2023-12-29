@@ -17,13 +17,14 @@ import typing as T
 import cv2
 import os
 from AudioRecorder import AudioRecorder
-
+from QueryProcessor import QueryProcessorGPT4V
 
 
 async def main():
     # global collect_data
-    control_signal = ControlSignalClock(interval=5)
+    control_signal = ControlSignalClock(interval=10)
     asyncio.create_task(control_signal.run())
+    query_processor = QueryProcessorGPT4V("http://127.0.0.1:5000/api/voila-4v")
     
     async with Network() as network:
         dev_info = await network.wait_for_new_device(timeout_seconds=5)
@@ -75,12 +76,13 @@ async def main():
         )
         
         try:
-            await save_query_data(queue_video, queue_gaze, queue_audio, control_signal)
+            await save_query_data(queue_video, queue_gaze, queue_audio, control_signal, query_processor)
         finally:
             process_video.cancel()
             process_gaze.cancel()
             process_audio.cancel()
             
+
         
 async def enqueue_audio_data(audio: AudioRecorder, queue: asyncio.Queue, control_signal: ControlSignalBase) -> None:
     ''' 将传感器的数据不断加入某个队列中 '''
@@ -102,7 +104,10 @@ async def enqueue_sensor_data(sensor: T.AsyncIterator, queue: asyncio.Queue, con
                 print(f"Queue is full, dropping {datum}")
 
 
-async def save_query_data(queue_video: asyncio.Queue, queue_gaze: asyncio.Queue, queue_audio: asyncio.Queue, control_signal: ControlSignalBase):
+async def save_query_data(
+    queue_video: asyncio.Queue, queue_gaze: asyncio.Queue, 
+    queue_audio: asyncio.Queue, control_signal: ControlSignalBase, 
+    query_processor: QueryProcessorGPT4V):
     ''' 保存数据
     在检测到录制结束的信号以及保存数据的信号时，将数据保存到文件中，保存成功后将保存数据的信号复位
     '''
@@ -140,6 +145,10 @@ async def save_query_data(queue_video: asyncio.Queue, queue_gaze: asyncio.Queue,
             video.release()
             AudioRecorder.save_wavefile(os.path.join(data_dir, "audio.wav"), audio_data)
             print("data saved!")
+            
+            # ------------ query ------------
+            response = query_processor.query(data_dir)
+            print("response: ", response)
             await control_signal.save_executed()
         await asyncio.sleep(1)
     

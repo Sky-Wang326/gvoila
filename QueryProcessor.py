@@ -14,10 +14,6 @@ class QueryProcessorGPT4V:
     def __init__(self, request_url):
         self.request_url = request_url
 
-
-    
-    
-
     def query(self, query_folder):
         for file in ["audio.wav", "gaze_data.json", "video.mp4", "video_timestamp.json"]:
             if not os.path.isfile(os.path.join(query_folder, file)):
@@ -83,7 +79,8 @@ class QueryProcessorGPT4V:
                 return
             with open (os.path.join(query_folder, "response.json"), "w") as f:
                 json.dump(responses, f, ensure_ascii=False, indent=4)
-            print("response: ", responses)
+            # print("response: ", responses)
+            return responses
         
         
         
