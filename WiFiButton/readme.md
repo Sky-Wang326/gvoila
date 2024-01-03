@@ -1,0 +1,2 @@
+- 使用esp-idf，打开tcp-server example，将main文件替换成button.c即可。
+- 可用esp32系列板子。
