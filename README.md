@@ -18,5 +18,15 @@ Code to setup the agent service on PC / GPU server is in [voila-service](./voila
 [GPT-4v](https://platform.openai.com/docs/guides/vision) serves as the main visual language model to answer user's questions, one need to paste their own API key to use it. [Whisper](https://github.com/openai/whisper) is used to transcript the user's audio query to text. [SAM](https://github.com/facebookresearch/segment-anything) is used to crop the object of interest based on gaze points from the user's view. Both Whisper and SAM requires a GPU to run, yet one can substitute them with official API if GPU is not available.
 
 ## Components 2 - Smart Glasses (Pupil Lab Invisible)
+For smart glasses, we use [Pupil Lab Invisible(setup tutorials)](https://docs.pupil-labs.com/invisible/) as the hardware. When running G-VOILA, Pupil Lab Invisible and the hosting PC should connect to the same network. 
+```
+python main.py
+```
+
 
 ## Components 3 - Query Trigger (Wireless Push Button)
+To start querying, a trigger is needed. While keyword spotting such as "Hey VOILA" is a promising solution, we use a wireless push button as a simple yet effective solution. The button is connected to the PC via Wi-Fi, that is, the button, Pupil Lab Invisible and the PC should connect to the same network.
+
+The code for making your own Wi-Fi button is in [WiFiButton](./WiFiButton) folder. We used ESP32 dev board. For requirements and setup, please refer to [WiFiButton/README.md](./WiFiButton/README.md).
+
+To switch another triggering method, one can implement a customized [ControlSignal](ControlSignal.py) class.
