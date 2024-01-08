@@ -6,7 +6,7 @@
 import asyncio
 import contextlib
 import json
-from ControlSignal import ControlSignalClock, ControlSignalBase
+from ControlSignal import ControlSignalClock, ControlSignalBase, ControlSignalWiFiButton
 from pupil_labs.realtime_api import (
     Device,
     Network,
@@ -21,9 +21,8 @@ from QueryProcessor import QueryProcessorGPT4V
 
 
 async def main():
-    # global collect_data
-    control_signal = ControlSignalClock(interval=10)
-    asyncio.create_task(control_signal.run())
+    control_signal = ControlSignalWiFiButton(ip="192.168.31.124", port=3328)
+    
     query_processor = QueryProcessorGPT4V("http://127.0.0.1:5000/api/voila-4v")
     
     async with Network() as network:
@@ -74,6 +73,7 @@ async def main():
                 control_signal
             )
         )
+        asyncio.create_task(control_signal.run())
         
         try:
             await save_query_data(queue_video, queue_gaze, queue_audio, control_signal, query_processor)
